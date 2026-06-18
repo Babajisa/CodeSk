@@ -1,0 +1,9 @@
+streamlit
+pandas
+numpy
+faiss-cpu
+transformers
+torch
+arabert
+google-generativeai
+python-dotenv

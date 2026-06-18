@@ -1,0 +1,18 @@
+# Folder dokumen dan isinya
+dokumen/
+
+# File konfigurasi sensitif
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database lokal (dihapus dari ignore agar dapat dipush ke git untuk streamlit)
+
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
