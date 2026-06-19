@@ -10,12 +10,129 @@ import uuid
 from transformers import AutoTokenizer, AutoModel
 from arabert.preprocess import ArabertPreprocessor
 from dotenv import load_dotenv
+import re
 
 # Membaca file .env di awal aplikasi
 load_dotenv()
 
 # Tampilan halaman Streamlit minimalis berfokus di tengah
 st.set_page_config(page_title="Asisten Tanya Jawab Islami", layout="centered")
+
+# Custom styling untuk tampilan premium
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Amiri:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+
+/* Main font styling */
+html, body, [class*="css"] {
+    font-family: 'Outfit', sans-serif;
+}
+
+/* Background gradient styling */
+.stApp {
+    background: linear-gradient(135deg, #0b1329 0%, #1c1538 50%, #030712 100%) !important;
+    color: #e2e8f0 !important;
+}
+
+/* Sidebar styling */
+[data-testid="stSidebar"] {
+    background-color: rgba(11, 19, 41, 0.95) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Header text inside sidebar */
+[data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
+    color: #10b981 !important;
+}
+
+/* Chat container and message cards styling */
+.stChatMessage {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 16px !important;
+    padding: 16px 20px !important;
+    margin-bottom: 15px !important;
+    backdrop-filter: blur(10px) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2) !important;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.stChatMessage:hover {
+    transform: translateY(-2px);
+    border-color: rgba(16, 185, 129, 0.4) !important;
+    box-shadow: 0 6px 24px rgba(16, 185, 129, 0.15) !important;
+}
+
+/* Chat avatar custom shape */
+[data-testid="chatAvatarIcon-user"], [data-testid="chatAvatarIcon-assistant"] {
+    background-color: #10b981 !important;
+}
+
+/* Make Arabic text beautiful and readable */
+.arabic-text {
+    font-family: 'Amiri', serif !important;
+    font-size: 1.65rem !important;
+    line-height: 2.3 !important;
+    direction: rtl !important;
+    text-align: right !important;
+    color: #ffd700 !important; /* gold color for Arabic text */
+    padding: 12px 18px !important;
+    background: rgba(255, 255, 255, 0.02) !important;
+    border-radius: 12px !important;
+    margin-top: 12px !important;
+    margin-bottom: 12px !important;
+    border-right: 4px solid #ffd700 !important;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+/* Custom header/title gradient styling */
+.main-title {
+    background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    font-weight: 700 !important;
+    font-size: 2.6rem !important;
+    margin-bottom: 0.5rem !important;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+}
+
+.sub-title {
+    color: #94a3b8 !important;
+    font-size: 1.1rem !important;
+    margin-bottom: 2rem !important;
+}
+
+/* Reference card */
+.reference-card {
+    background-color: rgba(16, 185, 129, 0.08) !important;
+    border-left: 4px solid #10b981 !important;
+    padding: 12px 18px !important;
+    border-radius: 4px 12px 12px 4px !important;
+    margin-top: 15px !important;
+    font-size: 0.95rem !important;
+    color: #a7f3d0 !important;
+    border: 1px solid rgba(16, 185, 129, 0.15) !important;
+}
+
+/* Custom buttons styling */
+.stButton>button {
+    background: linear-gradient(90deg, #10b981 0%, #059669 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 12px !important;
+    padding: 8px 20px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2) !important;
+    transition: all 0.3s ease !important;
+    width: 100% !important;
+}
+
+.stButton>button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35) !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # Pengaturan User ID di URL query parameters untuk riwayat chat persisten
 if "user_id" not in st.query_params:
@@ -126,6 +243,19 @@ def get_embedding(text):
         outputs = model(**inputs)
     return outputs.last_hidden_state.mean(dim=1).numpy().flatten()
 
+def format_output_with_arabic(text):
+    # Regex to match sequences of 8 or more Arabic characters/diacritics
+    arabic_pattern = r'([\u0600-\u06FF][\u0600-\u06FF\s\u064B-\u065F\u0670\u06D6-\u06ED\u06F0-\u06F9\u060C\u061B\u061F\(\)]*[\u0600-\u06FF])'
+    
+    def wrap_arabic(match):
+        val = match.group(0).strip()
+        if val:
+            val_clean = val.replace('\n', '<br>')
+            return f'<div class="arabic-text" dir="rtl">{val_clean}</div>'
+        return match.group(0)
+        
+    return re.sub(arabic_pattern, wrap_arabic, text)
+
 def check_prompt_relevance(prompt, api_key):
     url_openai = "https://api.openai.com/v1/chat/completions"
     headers = {
@@ -164,8 +294,8 @@ def check_prompt_relevance(prompt, api_key):
 # ==========================================
 # 3. ANTARMUKA CHAT UTAMA
 # ==========================================
-st.title("🕌 Asisten Pintar Al-Qur'an & Tafsir AI")
-st.write("Silakan masukkan pertanyaan Anda di kolom bawah untuk mencari rujukan ayat secara otomatis.")
+st.markdown('<div class="main-title">🕌 Asisten Pintar Al-Qur\'an & Tafsir AI</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-title">Silakan masukkan pertanyaan Anda di kolom bawah untuk mencari rujukan ayat secara otomatis.</div>', unsafe_allow_html=True)
 
 if index is None or metadata is None:
     st.warning("⚠️ Database sistem (`faiss_vdb`) belum dibangun atau tidak ditemukan di server.")
@@ -203,11 +333,11 @@ else:
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+            st.markdown(format_output_with_arabic(message["content"]), unsafe_allow_html=True)
 
     if query_user := st.chat_input("Tanyakan sesuatu tentang Al-Qur'an atau Tafsir..."):
         with st.chat_message("user"):
-            st.markdown(query_user)
+            st.markdown(format_output_with_arabic(query_user), unsafe_allow_html=True)
         st.session_state.messages.append({"role": "user", "content": query_user})
         save_chat_history(user_id, st.session_state.messages)
 
@@ -296,10 +426,10 @@ JAWABAN:"""
                     sumber_unik = list(set(sumber_list))
                     info_sumber = ""
                     if sumber_unik:
-                        info_sumber = f"\n\n*📚 Rujukan Referensi: {', '.join(sumber_unik)}*"
+                        info_sumber = f'\n\n<div class="reference-card">📚 **Rujukan Referensi:** {", ".join(sumber_unik)}</div>'
                     
                     jawaban_final = jawaban_ai + info_sumber
-                    message_placeholder.markdown(jawaban_final)
+                    message_placeholder.markdown(format_output_with_arabic(jawaban_final), unsafe_allow_html=True)
                     st.session_state.messages.append({"role": "assistant", "content": jawaban_final})
                     save_chat_history(user_id, st.session_state.messages)
                 except Exception as e:
