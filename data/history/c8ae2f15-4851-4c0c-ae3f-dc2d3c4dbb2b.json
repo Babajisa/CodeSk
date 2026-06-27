@@ -1,0 +1,18 @@
+[
+  {
+    "role": "user",
+    "content": "apakah di dalam alquran diperbolehkan minum alkohol?"
+  },
+  {
+    "role": "assistant",
+    "content": "Berdasarkan **rujukan dokumen yang Anda berikan, informasi tentang hukum minum alkohol tidak ditemukan** secara langsung.\n\nDokumen hanya memuat:\n- **QS. Al-Mutaffifin 83:28** tentang minuman di surga,\n- **Al-Baqarah 2:187** tentang sahur,\n- **Al-Waqi’ah 56:19** tentang pelayan-pelayan surga yang membawa minuman.\n\nJadi, **saya tidak dapat memastikan dari dokumen ini apakah Al-Qur’an memperbolehkan minum alkohol atau tidak**. Jika Anda ingin, saya bisa membantu menjawabnya berdasarkan ayat-ayat Al-Qur’an lain yang memang membahas khamr, asalkan Anda mengizinkan saya menggunakan sumber di luar dokumen ini.\n\n<div class=\"reference-card\">📚 **Rujukan Referensi:** Al-Qur'an: QS. Al-Mutaffifin (83:28), Artikel: Tafsir Surah At-Tur Ayat 22-25, Artikel: Sahur dan Kesehatan: Menyelami Hikmah QS Al-Baqarah 187</div>"
+  },
+  {
+    "role": "user",
+    "content": "saya bisa membantu menjawabnya berdasarkan ayat-ayat Al-Qur’an lain yang memang membahas khamr, asalkan Anda mengizinkan saya menggunakan sumber di luar dokumen ini.\\"
+  },
+  {
+    "role": "assistant",
+    "content": "Saya tidak menemukan informasi tentang **khamr** pada dokumen rujukan yang Anda berikan.\n\nDokumen yang tersedia hanya memuat:\n- kaidah penafsiran Al-Qur’an melalui Al-Qur’an, hadis, sahabat, dan tabi’in,\n- kutipan **Surah At-Taubah ayat 40** tentang Nabi dalam gua,\n- serta pembahasan singkat tentang **asbābun nuzūl**.\n\nKarena itu, saya belum bisa menjawab pertanyaan tentang khamr berdasarkan dokumen ini saja. Jika Anda ingin, silakan kirim pertanyaan yang sesuai dengan isi dokumen, atau izinkan saya menggunakan sumber di luar dokumen untuk menjawab tentang khamr.\n\n<div class=\"reference-card\">📚 **Rujukan Referensi:** Artikel: Manhaj dan Mabādi’ ‘Asyrah Tafsir Tarbawi, Artikel: Tafsir Surah at-Taubah Ayat 40: Kisah Hijrah Abu Bakar, Artikel: Telusur Kaidah Asbabunnuzul dalam Kitab-Kitab ‘Ulūm al-Qur’ān</div>"
+  }
+]

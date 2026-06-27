@@ -20,6 +20,41 @@ tokenizer = None
 model = None
 preprocessor = None
 
+def chunk_text(text, max_chars=600, overlap=100):
+    chunks = []
+    text_len = len(text)
+    if text_len <= max_chars:
+        return [text]
+    
+    start = 0
+    while start < text_len:
+        end = start + max_chars
+        if end < text_len:
+            # Cari pembatas kalimat/kata agar pemotongan lebih rapi
+            boundary = -1
+            for separator in ['. ', '\n', '? ', '! ', ' ']:
+                pos = text.rfind(separator, start + max_chars - overlap, end)
+                if pos != -1:
+                    boundary = pos + len(separator)
+                    break
+            if boundary != -1:
+                end = boundary
+        
+        chunk = text[start:end].strip()
+        if len(chunk) >= 20:
+            chunks.append(chunk)
+            
+        start = end - overlap
+        if start >= text_len - 50:
+            break
+            
+    return chunks
+
+def mean_pooling(model_output, attention_mask):
+    token_embeddings = model_output[0]
+    input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+
 def init_models(custom_model=None, custom_tokenizer=None, custom_preprocessor=None):
     global device, tokenizer, model, preprocessor
     if custom_model is not None:
@@ -49,7 +84,7 @@ def get_embedding(text):
     inputs = tokenizer(cleaned_text, padding=True, truncation=True, max_length=512, return_tensors="pt").to(device)
     with torch.no_grad():
         outputs = model(**inputs)
-    return outputs.last_hidden_state.mean(dim=1).cpu().numpy().flatten()
+    return mean_pooling(outputs, inputs['attention_mask']).cpu().numpy().flatten()
 
 def get_embeddings_batched(texts, batch_size=128, custom_model=None, custom_tokenizer=None, custom_preprocessor=None, progress_callback=None):
     init_models(custom_model, custom_tokenizer, custom_preprocessor)
@@ -67,7 +102,7 @@ def get_embeddings_batched(texts, batch_size=128, custom_model=None, custom_toke
         inputs = tokenizer(cleaned_texts, padding=True, truncation=True, max_length=512, return_tensors="pt").to(device)
         with torch.no_grad():
             outputs = model(**inputs)
-        batch_embeddings = outputs.last_hidden_state.mean(dim=1).cpu().numpy()
+        batch_embeddings = mean_pooling(outputs, inputs['attention_mask']).cpu().numpy()
         embeddings.append(batch_embeddings)
         
         completed = min(i + batch_size, total)
@@ -96,17 +131,10 @@ def build_database(custom_model=None, custom_tokenizer=None, custom_preprocessor
             if pd.isna(isi_artikel) or isi_artikel.strip() == "":
                 continue
                 
-            # STRATEGI CHUNKING: Potong teks artikel berdasarkan paragraf baru (\n)
-            paragraphs = [p.strip() for p in isi_artikel.split("\n") if p.strip()]
-            
-            # Jika teks tidak memiliki enter, pecah berdasarkan tanda titik (.)
-            if len(paragraphs) == 1:
-                paragraphs = [p.strip() + "." for p in isi_artikel.split(".") if p.strip()]
+            # STRATEGI CHUNKING: Potong teks artikel menggunakan sliding window
+            chunks = chunk_text(isi_artikel, max_chars=600, overlap=100)
 
-            for chunk in paragraphs:
-                if len(chunk) < 20: # Abaikan potongan teks/kalimat yang terlalu pendek
-                    continue
-                
+            for chunk in chunks:
                 texts_to_embed.append(chunk)
                 metadata.append({
                     "teks": chunk,
@@ -172,6 +200,11 @@ def build_database(custom_model=None, custom_tokenizer=None, custom_preprocessor
         print("Membangun index FAISS...")
         if progress_callback:
             progress_callback(len(texts_to_embed), len(texts_to_embed), "Membangun index FAISS...")
+        
+        # L2-normalisasi embedding agar sesuai untuk pencarian Cosine Similarity
+        norms = np.linalg.norm(new_embeddings, axis=1, keepdims=True)
+        norms = np.clip(norms, 1e-9, None)
+        new_embeddings = new_embeddings / norms
         
         index = faiss.IndexFlatL2(384)
         index.add(new_embeddings)

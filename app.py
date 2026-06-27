@@ -210,7 +210,7 @@ if st.sidebar.button("🧹 Hapus Riwayat Chat", use_container_width=True):
     st.rerun()
 
 st.sidebar.write("---")
-st.sidebar.info("Aplikasi ini menggunakan model GPT-5.4 mini resmi dari OpenAI untuk menjawab pertanyaan berdasarkan rujukan Al-Qur'an dan Tafsir.")
+st.sidebar.info("Aplikasi ini menggunakan model GPT-4o mini resmi dari OpenAI untuk menjawab pertanyaan berdasarkan rujukan Al-Qur'an dan Tafsir.")
 
 # ==========================================
 # 2. LOAD MODEL & DATABASE (Latar Belakang)
@@ -233,6 +233,11 @@ def load_resources():
 
 preprocessor, tokenizer, model, index, metadata = load_resources()
 
+def mean_pooling(model_output, attention_mask):
+    token_embeddings = model_output[0]
+    input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+
 def get_embedding(text):
     if any("\u0600" <= c <= "\u06FF" for c in str(text)):
         cleaned_text = preprocessor.preprocess(str(text))
@@ -241,7 +246,39 @@ def get_embedding(text):
     inputs = tokenizer(cleaned_text, padding=True, truncation=True, max_length=512, return_tensors="pt")
     with torch.no_grad():
         outputs = model(**inputs)
-    return outputs.last_hidden_state.mean(dim=1).numpy().flatten()
+    return mean_pooling(outputs, inputs['attention_mask']).numpy().flatten()
+
+def keyword_search(query, metadata, k=5):
+    # Bersihkan token/kata dari query
+    words = [w.lower() for w in re.findall(r'\w+', query) if len(w) > 2]
+    # Abaikan kata sandang/tanya umum (stop words) dalam bahasa Indonesia
+    stop_words = {'mengapa', 'bagaimana', 'apakah', 'adakah', 'yang', 'dalam', 'dan', 'atau', 'untuk', 'dengan', 'dari', 'pada', 'saya', 'bisa', 'dapat'}
+    keywords = [w for w in words if w not in stop_words]
+    
+    if not keywords:
+        return []
+        
+    scores = []
+    for idx, item in enumerate(metadata):
+        text_lower = item["teks"].lower()
+        sumber_lower = item["sumber"].lower()
+        score = 0
+        for kw in keywords:
+            # Pencocokan substring dalam teks artikel/ayat
+            if kw in text_lower:
+                score += 1
+                # Berikan bobot ekstra jika kecocokan merupakan kata utuh (word boundary)
+                if re.search(r'\b' + re.escape(kw) + r'\b', text_lower):
+                    score += 2
+            # Pencocokan dalam nama sumber (contoh: "zakat" atau "riba")
+            if kw in sumber_lower:
+                score += 1
+        if score > 0:
+            scores.append((idx, score))
+            
+    # Urutkan berdasarkan skor tertinggi
+    scores.sort(key=lambda x: x[1], reverse=True)
+    return [idx for idx, score in scores[:k]]
 
 def format_output_with_arabic(text):
     # Regex to match sequences of 8 or more Arabic characters/diacritics
@@ -363,29 +400,69 @@ else:
         else:
             with st.spinner("Sedang menelusuri rujukan database lokal..."):
                 query_vector = np.array([get_embedding(query_user)]).astype('float32')
-                k_actual = min(3, len(metadata))
-                D, I = index.search(query_vector, k_actual)
+                # Normalisasi L2 query vector agar cocok untuk pencarian kemiripan kosinus
+                norm_q = np.linalg.norm(query_vector)
+                if norm_q > 1e-9:
+                    query_vector = query_vector / norm_q
+                
+                # 1. Ambil kecocokan semantik dari FAISS (ambil 5 terdekat)
+                D, I = index.search(query_vector, 5)
+                semantic_indices = [idx for idx in I.flatten() if idx != -1 and idx < len(metadata)]
+                
+                # 2. Ambil kecocokan kata kunci (keyword matching) (ambil 5 terdekat)
+                keyword_indices = keyword_search(query_user, metadata, k=5)
+                
+                # Gabungkan kedua kelompok indeks (semantik diletakkan di awal, lalu keyword)
+                combined_indices = []
+                seen_idx = set()
+                for idx in semantic_indices + keyword_indices:
+                    if idx not in seen_idx:
+                        seen_idx.add(idx)
+                        combined_indices.append(idx)
+                
+                # Batasi total pencarian maksimal 10 rujukan
+                combined_indices = combined_indices[:10]
                 
                 konteks_list = []
                 sumber_list = []
                 seen_texts = set()
                 
-                for idx in I.flatten():
-                    if idx != -1 and idx < len(metadata):
-                        item = metadata[idx]
-                        if item['teks'] not in seen_texts:
-                            seen_texts.add(item['teks'])
-                            konteks_list.append(item['teks'])
-                            sumber_list.append(item['sumber'])
+                for idx in combined_indices:
+                    item = metadata[idx]
+                    if item['teks'] not in seen_texts:
+                        seen_texts.add(item['teks'])
+                        konteks_list.append(item['teks'])
+                        sumber_list.append(item['sumber'])
 
             with st.chat_message("assistant"):
                 message_placeholder = st.empty()
                 
-                konteks_string = "\n".join([f"- {txt}" for txt in konteks_list])
-                prompt_rag = f"""Anda adalah asisten ahli tafsir Al-Qur'an. Jawablah pertanyaan pengguna dengan sopan, jelas, dan akurat berdasarkan Rujukan Dokumen yang disediakan di bawah ini. Jika jawabannya tidak ada di dalam dokumen, katakan sejujurnya bahwa informasi tersebut tidak ditemukan dalam database Anda.
+                quran_list = []
+                tafsir_list = []
+                for txt, src in zip(konteks_list, sumber_list):
+                    if "Al-Qur'an" in src:
+                        quran_list.append(txt)
+                    else:
+                        tafsir_list.append(f"[{src}]\n{txt}")
+                
+                quran_string = "\n\n".join(quran_list) if quran_list else "Tidak ada rujukan ayat Al-Qur'an langsung yang ditemukan."
+                tafsir_string = "\n\n".join(tafsir_list) if tafsir_list else "Tidak ada rujukan artikel tafsir tambahan yang ditemukan."
 
-RUJUKAN DOKUMEN:
-{konteks_string}
+                prompt_rag = f"""Anda adalah asisten ahli tafsir Al-Qur'an. Tugas Anda adalah menjawab pertanyaan pengguna secara jelas, akurat, dan sopan menggunakan Rujukan Dokumen yang disediakan di bawah.
+
+Berikut adalah Rujukan Dokumen yang dibagi menjadi dua bagian:
+
+--- RUJUKAN AYAT AL-QUR'AN ---
+{quran_string}
+
+--- RUJUKAN ARTIKEL TAFSIR ---
+{tafsir_string}
+
+PANDUAN MENJAWAB:
+1. JIKA terdapat ayat Al-Qur'an yang relevan di bagian "RUJUKAN AYAT AL-QUR'AN", Anda WAJIB menampilkan teks Arab asli ayat tersebut beserta terjemahannya secara lengkap (verbatim) di dalam jawaban Anda.
+2. Rujukan di bagian "RUJUKAN ARTIKEL TAFSIR" adalah penjelasan tambahan. Gunakan artikel tafsir ini HANYA jika ia relevan dengan pertanyaan untuk memberikan konteks penjelasan/tafsir. Jika tidak relevan, abaikan saja bagian artikel tafsir ini.
+3. HATI-HATI: Jangan mengutip potongan tulisan bahasa Arab apa pun yang berada di dalam bagian "RUJUKAN ARTIKEL TAFSIR" sebagai teks ayat Al-Qur'an! Kutipan ayat Al-Qur'an asli hanya boleh diambil dari bagian "RUJUKAN AYAT AL-QUR'AN".
+4. Jika informasi jawaban sama sekali tidak ada di dalam kedua rujukan di atas, katakan sejujurnya bahwa informasi tersebut tidak ditemukan dalam database Anda.
 
 PERTANYAAN PENGGUNA:
 {query_user}
@@ -403,7 +480,7 @@ JAWABAN:"""
                     }
                     
                     payload = {
-                        "model": "gpt-5.4-mini",
+                        "model": "gpt-4o-mini",
                         "messages": [
                             {"role": "user", "content": prompt_rag}
                         ],
@@ -426,7 +503,18 @@ JAWABAN:"""
                     sumber_unik = list(set(sumber_list))
                     info_sumber = ""
                     if sumber_unik:
-                        info_sumber = f'\n\n<div class="reference-card">📚 **Rujukan Referensi:** {", ".join(sumber_unik)}</div>'
+                        # Urutkan agar rujukan Al-Qur'an tampil di atas, diikuti artikel tafsir
+                        sumber_quran = sorted([s for s in sumber_unik if "Al-Qur'an" in s])
+                        sumber_artikel = sorted([s for s in sumber_unik if "Al-Qur'an" not in s])
+                        sumber_sorted = sumber_quran + sumber_artikel
+                        
+                        list_items = "".join([f"<li style='margin-bottom: 4px;'>{s}</li>" for s in sumber_sorted])
+                        info_sumber = f'''\n\n<div class="reference-card">
+📖 <b>Untuk jawaban ini, Anda dapat merujuk pada:</b>
+<ul style="margin-top: 6px; margin-bottom: 0; padding-left: 20px; color: #a7f3d0;">
+{list_items}
+</ul>
+</div>'''
                     
                     jawaban_final = jawaban_ai + info_sumber
                     message_placeholder.markdown(format_output_with_arabic(jawaban_final), unsafe_allow_html=True)
