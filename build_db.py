@@ -117,7 +117,7 @@ def build_database(custom_model=None, custom_tokenizer=None, custom_preprocessor
     texts_to_embed = []
     metadata = []
 
-    # 1. MEMPROSES FILE ARTIKEL TAFSIR
+    # # 1. MEMPROSES FILE ARTIKEL TAFSIR
     if os.path.exists(TAFSIR_FILE):
         print(f"Membaca file artikel tafsir dari '{TAFSIR_FILE}'...")
         if progress_callback:
