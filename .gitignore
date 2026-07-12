@@ -19,3 +19,6 @@ ENV/
 
 # Chat history
 data/history/
+
+# Lampiran dokumen akademik
+lampiran/
