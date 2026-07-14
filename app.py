@@ -12,9 +12,11 @@ import shutil
 from dotenv import load_dotenv
 import generate_sources  # Import helper untuk generate file Juz Amma
 
-# Konfigurasi endpoint mirror Hugging Face untuk stabilitas koneksi (terutama di Streamlit Cloud)
-if "HF_ENDPOINT" not in os.environ:
-    os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+# Meningkatkan batas waktu (timeout) koneksi ke Hugging Face Hub (defaultnya sangat pendek: 10s)
+os.environ["HF_HUB_ETAG_TIMEOUT"] = "1000"
+# Hapus overriding endpoint mirror jika ada, gunakan endpoint resmi HF demi kecocokan sertifikat SSL
+if "HF_ENDPOINT" in os.environ:
+    del os.environ["HF_ENDPOINT"]
 
 # Membaca file .env di awal aplikasi
 load_dotenv()
@@ -235,13 +237,13 @@ def load_resources():
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = AutoModel.from_pretrained(model_name)
     except Exception as e:
-        st.error(f"DEBUG - Error Koneksi HF/Mirror: {e}")
+        st.error(f"DEBUG - Error Koneksi HF (repr): {repr(e)}")
         # Fallback menggunakan file yang sudah terunduh di cache lokal (mode offline) jika koneksi internet terganggu
         try:
             tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=True)
             model = AutoModel.from_pretrained(model_name, local_files_only=True)
         except Exception as e2:
-            st.error(f"DEBUG - Error Cache Lokal: {e2}")
+            st.error(f"DEBUG - Error Cache Lokal (repr): {repr(e2)}")
             st.stop()
             
     preprocessor = ArabertPreprocessor(model_name="aubmindlab/bert-base-arabertv02")

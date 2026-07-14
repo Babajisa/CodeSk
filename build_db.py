@@ -5,9 +5,11 @@ import torch
 import faiss
 import pickle
 
-# Konfigurasi endpoint mirror Hugging Face untuk stabilitas koneksi
-if "HF_ENDPOINT" not in os.environ:
-    os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+# Meningkatkan batas waktu (timeout) koneksi ke Hugging Face Hub (defaultnya sangat pendek: 10s)
+os.environ["HF_HUB_ETAG_TIMEOUT"] = "1000"
+# Hapus overriding endpoint mirror jika ada, gunakan endpoint resmi HF demi kecocokan sertifikat SSL
+if "HF_ENDPOINT" in os.environ:
+    del os.environ["HF_ENDPOINT"]
 
 # Jalur Berkas Dokumen
 TAFSIR_FILE = "data/artikel_tafsir_clean.csv"
