@@ -1,11 +1,13 @@
+import os
 import pandas as pd
 import numpy as np
 import torch
 import faiss
-import os
 import pickle
-from transformers import AutoTokenizer, AutoModel
-from arabert.preprocess import ArabertPreprocessor
+
+# Konfigurasi endpoint mirror Hugging Face untuk stabilitas koneksi
+if "HF_ENDPOINT" not in os.environ:
+    os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 # Jalur Berkas Dokumen
 TAFSIR_FILE = "data/artikel_tafsir_clean.csv"
@@ -71,8 +73,24 @@ def init_models(custom_model=None, custom_tokenizer=None, custom_preprocessor=No
             print(f"Menggunakan perangkat: {device.upper()}")
             print("Memuat model embedding...")
             model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-            tokenizer = AutoTokenizer.from_pretrained(model_name)
-            model = AutoModel.from_pretrained(model_name).to(device)
+            from transformers import AutoTokenizer, AutoModel
+            from arabert.preprocess import ArabertPreprocessor
+            
+            # Mencoba memuat model dan tokenizer dari Hugging Face (menggunakan mirror jika dikonfigurasi)
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(model_name)
+                model = AutoModel.from_pretrained(model_name).to(device)
+            except Exception as e:
+                # Fallback menggunakan file yang sudah terunduh di cache lokal (mode offline) jika koneksi internet terganggu
+                print(f"Koneksi gagal (Mencoba memuat dari cache lokal): {e}")
+                try:
+                    tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=True)
+                    model = AutoModel.from_pretrained(model_name, local_files_only=True).to(device)
+                except Exception as e2:
+                    raise OSError(
+                        f"Gagal memuat model. Koneksi ke Hugging Face bermasalah, dan tidak ada cache lokal yang tersedia.\n"
+                        f"Error Koneksi: {e}\nError Cache Lokal: {e2}"
+                    )
             preprocessor = ArabertPreprocessor(model_name="aubmindlab/bert-base-arabertv02")
 
 def get_embedding(text):

@@ -1,18 +1,20 @@
+import os
 import streamlit as st
 import numpy as np
 import torch
 import faiss
-import os
 import pickle
 import requests
 import json
 import uuid
 import re
 import shutil
-from transformers import AutoTokenizer, AutoModel
-from arabert.preprocess import ArabertPreprocessor
 from dotenv import load_dotenv
 import generate_sources  # Import helper untuk generate file Juz Amma
+
+# Konfigurasi endpoint mirror Hugging Face untuk stabilitas koneksi (terutama di Streamlit Cloud)
+if "HF_ENDPOINT" not in os.environ:
+    os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 # Membaca file .env di awal aplikasi
 load_dotenv()
@@ -225,8 +227,24 @@ def save_chat_history(uid, messages):
 @st.cache_resource
 def load_resources():
     model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModel.from_pretrained(model_name)
+    from transformers import AutoTokenizer, AutoModel
+    from arabert.preprocess import ArabertPreprocessor
+    
+    # Mencoba memuat model dan tokenizer dari Hugging Face (menggunakan mirror jika dikonfigurasi)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model = AutoModel.from_pretrained(model_name)
+    except Exception as e:
+        # Fallback menggunakan file yang sudah terunduh di cache lokal (mode offline) jika koneksi internet terganggu
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=True)
+            model = AutoModel.from_pretrained(model_name, local_files_only=True)
+        except Exception as e2:
+            raise OSError(
+                f"Gagal memuat model. Koneksi ke Hugging Face bermasalah, dan tidak ada cache lokal yang tersedia.\n"
+                f"Error Koneksi: {e}\nError Cache Lokal: {e2}"
+            )
+            
     preprocessor = ArabertPreprocessor(model_name="aubmindlab/bert-base-arabertv02")
     
     if os.path.exists(INDEX_FILE) and os.path.exists(METADATA_FILE):
