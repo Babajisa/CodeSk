@@ -849,13 +849,17 @@ JAWABAN:"""
                 # Buat kartu rujukan
                 info_sumber = ""
                 if sources_used:
-                    list_items = "".join([f"<li style='margin-bottom: 2px;'>{s}</li>" for s in sorted(list(set(sources_used)))])
-                    info_sumber = f'''\n\n<div class="reference-card">
-📖 <b>Dirujuk dari sumber aktif:</b>
-<ul style="margin-top: 4px; margin-bottom: 0; padding-left: 20px; color: #a7f3d0; font-size: 0.9rem;">
-{list_items}
-</ul>
-</div>'''
+                    unique_sources = sorted(list(set(sources_used)))
+                    list_items = "".join([f"<li style='margin-bottom: 2px;'>{s}</li>" for s in unique_sources])
+                    info_sumber = f'''\n\n<details style="margin-top: 15px; border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 10px; background-color: rgba(16, 185, 129, 0.05); cursor: pointer;">
+  <summary style="font-weight: bold; color: #10b981; outline: none;">
+    📖 Lihat {len(unique_sources)} Sumber Rujukan
+  </summary>
+  <ul style="margin-top: 8px; margin-bottom: 0; padding-left: 20px; color: #a7f3d0; font-size: 0.9rem;">
+    {list_items}
+  </ul>
+</details>'''
+
                 
                 jawaban_final = jawaban_ai + info_sumber
                 
