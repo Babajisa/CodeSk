@@ -235,15 +235,14 @@ def load_resources():
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = AutoModel.from_pretrained(model_name)
     except Exception as e:
+        st.error(f"DEBUG - Error Koneksi HF/Mirror: {e}")
         # Fallback menggunakan file yang sudah terunduh di cache lokal (mode offline) jika koneksi internet terganggu
         try:
             tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=True)
             model = AutoModel.from_pretrained(model_name, local_files_only=True)
         except Exception as e2:
-            raise OSError(
-                f"Gagal memuat model. Koneksi ke Hugging Face bermasalah, dan tidak ada cache lokal yang tersedia.\n"
-                f"Error Koneksi: {e}\nError Cache Lokal: {e2}"
-            )
+            st.error(f"DEBUG - Error Cache Lokal: {e2}")
+            st.stop()
             
     preprocessor = ArabertPreprocessor(model_name="aubmindlab/bert-base-arabertv02")
     
