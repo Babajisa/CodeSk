@@ -14,11 +14,10 @@ import generate_sources  # Import helper untuk generate file Juz Amma
 
 # Meningkatkan batas waktu (timeout) koneksi ke Hugging Face Hub (defaultnya sangat pendek: 10s)
 os.environ["HF_HUB_ETAG_TIMEOUT"] = "1000"
-# Aktifkan HF Transfer untuk download model berkecepatan tinggi berbasis Rust
-os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 # Hapus overriding endpoint mirror jika ada, gunakan endpoint resmi HF demi kecocokan sertifikat SSL
 if "HF_ENDPOINT" in os.environ:
     del os.environ["HF_ENDPOINT"]
+
 
 
 # Paksa override endpoint di memori jika library huggingface_hub sudah terlanjur dimuat

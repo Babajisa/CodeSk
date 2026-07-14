@@ -8,4 +8,3 @@ arabert
 google-generativeai
 python-dotenv
 accelerate
-hf-transfer
