@@ -12,8 +12,9 @@ import shutil
 from dotenv import load_dotenv
 import generate_sources  # Import helper untuk generate file Juz Amma
 
-# Atur batas waktu (timeout) koneksi ke Hugging Face Hub ke 15s agar tidak menggantung jika ada kendala jaringan
-os.environ["HF_HUB_ETAG_TIMEOUT"] = "15"
+# Atur batas waktu (timeout) koneksi ke Hugging Face Hub ke 60s agar aman dari kendala jaringan lambat
+os.environ["HF_HUB_ETAG_TIMEOUT"] = "60"
+
 # Hapus overriding endpoint mirror jika ada, gunakan endpoint resmi HF demi kecocokan sertifikat SSL
 if "HF_ENDPOINT" in os.environ:
     del os.environ["HF_ENDPOINT"]
@@ -259,10 +260,40 @@ def save_chat_history(uid, messages):
 # ==========================================
 @st.cache_resource
 def load_resources():
-    print("DEBUG: Memulai load_resources() (Mode API)...", flush=True)
+    print("DEBUG: Memulai load_resources()...", flush=True)
+    model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    
+    print("DEBUG: Mengimpor library transformers...", flush=True)
+    from transformers import AutoTokenizer, AutoModel
     
     print("DEBUG: Mengimpor ArabertPreprocessor...", flush=True)
     from arabert.preprocess import ArabertPreprocessor
+    
+    # Mencoba memuat model dan tokenizer dari Hugging Face
+    print(f"DEBUG: Mencoba memuat tokenizer & model dari Hugging Face ({model_name})...", flush=True)
+    try:
+        print("DEBUG: Memuat tokenizer...", flush=True)
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        print("DEBUG: Memuat model...", flush=True)
+        model = AutoModel.from_pretrained(model_name, low_cpu_mem_usage=True)
+        print("DEBUG: Berhasil memuat model dari Hugging Face!", flush=True)
+    except Exception as e:
+        print(f"DEBUG: Error koneksi Hugging Face: {e}", flush=True)
+        st.error(f"DEBUG - Error Koneksi HF (repr): {repr(e)}")
+        # Fallback menggunakan file yang sudah terunduh di cache lokal (mode offline) jika koneksi internet terganggu
+        try:
+            print("DEBUG: Mencoba fallback memuat tokenizer dari cache lokal...", flush=True)
+            tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=True)
+            print("DEBUG: Mencoba fallback memuat model dari cache lokal...", flush=True)
+            model = AutoModel.from_pretrained(model_name, local_files_only=True, low_cpu_mem_usage=True)
+            print("DEBUG: Berhasil memuat dari cache lokal!", flush=True)
+        except Exception as e2:
+            print(f"DEBUG: Error memuat dari cache lokal: {e2}", flush=True)
+            st.error(f"DEBUG - Error Cache Lokal (repr): {repr(e2)}")
+            st.stop()
+
+            
+    print("DEBUG: Menginisialisasi ArabertPreprocessor...", flush=True)
     preprocessor = ArabertPreprocessor(model_name="aubmindlab/bert-base-arabertv02")
     print("DEBUG: ArabertPreprocessor berhasil diinisialisasi!", flush=True)
     
@@ -279,35 +310,26 @@ def load_resources():
         index, metadata = None, None
         
     print("DEBUG: Selesai memuat semua resources di load_resources()!", flush=True)
-    return preprocessor, None, None, index, metadata
+
+    return preprocessor, tokenizer, model, index, metadata
 
 preprocessor, tokenizer, model, index, metadata = load_resources()
 
+
+def mean_pooling(model_output, attention_mask):
+    token_embeddings = model_output[0]
+    input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
 
 def get_embedding(text):
     if any("\u0600" <= c <= "\u06FF" for c in str(text)):
         cleaned_text = preprocessor.preprocess(str(text))
     else:
         cleaned_text = str(text)
-        
-    # Panggil API Hugging Face untuk mendapatkan embedding secara instan
-    api_url = "https://router.huggingface.co/hf-inference/models/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-
-    headers = {}
-    if os.environ.get('HF_TOKEN'):
-        headers["Authorization"] = f"Bearer {os.environ.get('HF_TOKEN')}"
-    payload = {"inputs": cleaned_text, "options": {"wait_for_model": True}}
-    
-    try:
-        response = requests.post(api_url, headers=headers, json=payload, timeout=15)
-        if response.status_code == 200:
-            return np.array(response.json()).flatten()
-        else:
-            raise RuntimeError(f"Error HF API {response.status_code}: {response.text}")
-    except Exception as e:
-        st.error(f"Gagal memanggil Hugging Face Inference API: {e}")
-        st.stop()
-
+    inputs = tokenizer(cleaned_text, padding=True, truncation=True, max_length=512, return_tensors="pt")
+    with torch.no_grad():
+        outputs = model(**inputs)
+    return mean_pooling(outputs, inputs['attention_mask']).numpy().flatten()
 
 def keyword_search(query, metadata, k=5):
     words = [w.lower() for w in re.findall(r'\w+', query) if len(w) > 2]
