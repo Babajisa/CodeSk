@@ -291,23 +291,18 @@ def get_embedding(text):
     else:
         cleaned_text = str(text)
         
-    # Panggil API Hugging Face untuk mendapatkan embedding secara instan via router baru dengan paksaan pipeline feature-extraction
-    api_url = "https://router.huggingface.co/hf-inference/pipeline/feature-extraction/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-
-    headers = {}
-    if os.environ.get('HF_TOKEN'):
-        headers["Authorization"] = f"Bearer {os.environ.get('HF_TOKEN')}"
-    payload = {"inputs": cleaned_text, "options": {"wait_for_model": True}}
-    
     try:
-        response = requests.post(api_url, headers=headers, json=payload, timeout=15)
-        if response.status_code == 200:
-            return np.array(response.json()).flatten()
-        else:
-            raise RuntimeError(f"Error HF API {response.status_code}: {response.text}")
+        from huggingface_hub import InferenceClient
+        client = InferenceClient(api_key=os.environ.get('HF_TOKEN'))
+        result = client.feature_extraction(
+            model="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+            text=cleaned_text
+        )
+        return np.array(result).flatten()
     except Exception as e:
         st.error(f"Gagal memanggil Hugging Face Inference API: {e}")
         st.stop()
+
 
 
 def keyword_search(query, metadata, k=5):
