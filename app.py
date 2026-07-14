@@ -18,6 +18,14 @@ os.environ["HF_HUB_ETAG_TIMEOUT"] = "1000"
 if "HF_ENDPOINT" in os.environ:
     del os.environ["HF_ENDPOINT"]
 
+# Paksa override endpoint di memori jika library huggingface_hub sudah terlanjur dimuat
+try:
+    import huggingface_hub.constants
+    huggingface_hub.constants.ENDPOINT = "https://huggingface.co"
+except Exception:
+    pass
+
+
 # Membaca file .env di awal aplikasi
 load_dotenv()
 
