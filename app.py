@@ -19,13 +19,25 @@ if "HF_ENDPOINT" in os.environ:
     del os.environ["HF_ENDPOINT"]
 
 
-
 # Paksa override endpoint di memori jika library huggingface_hub sudah terlanjur dimuat
 try:
     import huggingface_hub.constants
     huggingface_hub.constants.ENDPOINT = "https://huggingface.co"
+    
+    # Hapus file .lock di folder cache Hugging Face untuk mencegah stuck/hang dari download sebelumnya yang terputus
+    import glob
+    cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+    if os.path.exists(cache_dir):
+        lock_files = glob.glob(os.path.join(cache_dir, "**/*.lock"), recursive=True)
+        for lock_file in lock_files:
+            try:
+                os.remove(lock_file)
+                print(f"DEBUG: Menghapus file lock lama: {lock_file}", flush=True)
+            except Exception:
+                pass
 except Exception:
     pass
+
 
 
 # Membaca file .env di awal aplikasi
