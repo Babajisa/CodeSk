@@ -236,36 +236,59 @@ def save_chat_history(uid, messages):
 # ==========================================
 @st.cache_resource
 def load_resources():
+    print("DEBUG: Memulai load_resources()...")
     model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    
+    print("DEBUG: Mengimpor library transformers...")
     from transformers import AutoTokenizer, AutoModel
+    
+    print("DEBUG: Mengimpor ArabertPreprocessor...")
     from arabert.preprocess import ArabertPreprocessor
     
-    # Mencoba memuat model dan tokenizer dari Hugging Face (menggunakan mirror jika dikonfigurasi)
+    # Mencoba memuat model dan tokenizer dari Hugging Face
+    print(f"DEBUG: Mencoba memuat tokenizer & model dari Hugging Face ({model_name})...")
     try:
+        print("DEBUG: Memuat tokenizer...")
         tokenizer = AutoTokenizer.from_pretrained(model_name)
+        print("DEBUG: Memuat model...")
         model = AutoModel.from_pretrained(model_name)
+        print("DEBUG: Berhasil memuat model dari Hugging Face!")
     except Exception as e:
+        print(f"DEBUG: Error koneksi Hugging Face: {e}")
         st.error(f"DEBUG - Error Koneksi HF (repr): {repr(e)}")
         # Fallback menggunakan file yang sudah terunduh di cache lokal (mode offline) jika koneksi internet terganggu
         try:
+            print("DEBUG: Mencoba fallback memuat tokenizer dari cache lokal...")
             tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=True)
+            print("DEBUG: Mencoba fallback memuat model dari cache lokal...")
             model = AutoModel.from_pretrained(model_name, local_files_only=True)
+            print("DEBUG: Berhasil memuat dari cache lokal!")
         except Exception as e2:
+            print(f"DEBUG: Error memuat dari cache lokal: {e2}")
             st.error(f"DEBUG - Error Cache Lokal (repr): {repr(e2)}")
             st.stop()
             
+    print("DEBUG: Menginisialisasi ArabertPreprocessor...")
     preprocessor = ArabertPreprocessor(model_name="aubmindlab/bert-base-arabertv02")
+    print("DEBUG: ArabertPreprocessor berhasil diinisialisasi!")
     
+    print("DEBUG: Memeriksa database FAISS...")
     if os.path.exists(INDEX_FILE) and os.path.exists(METADATA_FILE):
+        print(f"DEBUG: Membaca indeks FAISS dari {INDEX_FILE}...")
         index = faiss.read_index(INDEX_FILE)
+        print(f"DEBUG: Membaca metadata FAISS dari {METADATA_FILE}...")
         with open(METADATA_FILE, "rb") as f:
             metadata = pickle.load(f)
+        print("DEBUG: Berhasil membaca database FAISS!")
     else:
+        print("DEBUG: Database FAISS tidak ditemukan. Berjalan tanpa database rujukan.")
         index, metadata = None, None
         
+    print("DEBUG: Selesai memuat semua resources di load_resources()!")
     return preprocessor, tokenizer, model, index, metadata
 
 preprocessor, tokenizer, model, index, metadata = load_resources()
+
 
 def mean_pooling(model_output, attention_mask):
     token_embeddings = model_output[0]
