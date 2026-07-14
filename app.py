@@ -12,11 +12,12 @@ import shutil
 from dotenv import load_dotenv
 import generate_sources  # Import helper untuk generate file Juz Amma
 
-# Meningkatkan batas waktu (timeout) koneksi ke Hugging Face Hub (defaultnya sangat pendek: 10s)
-os.environ["HF_HUB_ETAG_TIMEOUT"] = "1000"
+# Atur batas waktu (timeout) koneksi ke Hugging Face Hub ke 15s agar tidak menggantung jika ada kendala jaringan
+os.environ["HF_HUB_ETAG_TIMEOUT"] = "15"
 # Hapus overriding endpoint mirror jika ada, gunakan endpoint resmi HF demi kecocokan sertifikat SSL
 if "HF_ENDPOINT" in os.environ:
     del os.environ["HF_ENDPOINT"]
+
 
 
 # Paksa override endpoint di memori jika library huggingface_hub sudah terlanjur dimuat
@@ -28,6 +29,11 @@ try:
     import glob
     cache_dir = getattr(huggingface_hub.constants, "HF_HUB_CACHE", None)
     print(f"DEBUG: HF Cache Directory: {cache_dir}", flush=True)
+    print(f"DEBUG: HF_TOKEN exists in env: {'HF_TOKEN' in os.environ}", flush=True)
+    if 'HF_TOKEN' in os.environ:
+        # Tampilkan 4 karakter pertama untuk verifikasi format (keamanan tetap terjaga)
+        tok_val = os.environ['HF_TOKEN']
+        print(f"DEBUG: HF_TOKEN starts with: {tok_val[:6]}...", flush=True)
     if cache_dir and os.path.exists(cache_dir):
         lock_files = glob.glob(os.path.join(cache_dir, "**/*.lock"), recursive=True)
         for lock_file in lock_files:
@@ -38,6 +44,7 @@ try:
                 pass
 except Exception as e:
     print(f"DEBUG: Gagal memuat/membersihkan constants Hugging Face: {e}", flush=True)
+
 
 
 
