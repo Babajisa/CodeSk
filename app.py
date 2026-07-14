@@ -14,9 +14,12 @@ import generate_sources  # Import helper untuk generate file Juz Amma
 
 # Meningkatkan batas waktu (timeout) koneksi ke Hugging Face Hub (defaultnya sangat pendek: 10s)
 os.environ["HF_HUB_ETAG_TIMEOUT"] = "1000"
+# Aktifkan HF Transfer untuk download model berkecepatan tinggi berbasis Rust
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 # Hapus overriding endpoint mirror jika ada, gunakan endpoint resmi HF demi kecocokan sertifikat SSL
 if "HF_ENDPOINT" in os.environ:
     del os.environ["HF_ENDPOINT"]
+
 
 # Paksa override endpoint di memori jika library huggingface_hub sudah terlanjur dimuat
 try:
@@ -251,7 +254,7 @@ def load_resources():
         print("DEBUG: Memuat tokenizer...", flush=True)
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         print("DEBUG: Memuat model...", flush=True)
-        model = AutoModel.from_pretrained(model_name)
+        model = AutoModel.from_pretrained(model_name, low_cpu_mem_usage=True)
         print("DEBUG: Berhasil memuat model dari Hugging Face!", flush=True)
     except Exception as e:
         print(f"DEBUG: Error koneksi Hugging Face: {e}", flush=True)
@@ -261,12 +264,13 @@ def load_resources():
             print("DEBUG: Mencoba fallback memuat tokenizer dari cache lokal...", flush=True)
             tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=True)
             print("DEBUG: Mencoba fallback memuat model dari cache lokal...", flush=True)
-            model = AutoModel.from_pretrained(model_name, local_files_only=True)
+            model = AutoModel.from_pretrained(model_name, local_files_only=True, low_cpu_mem_usage=True)
             print("DEBUG: Berhasil memuat dari cache lokal!", flush=True)
         except Exception as e2:
             print(f"DEBUG: Error memuat dari cache lokal: {e2}", flush=True)
             st.error(f"DEBUG - Error Cache Lokal (repr): {repr(e2)}")
             st.stop()
+
             
     print("DEBUG: Menginisialisasi ArabertPreprocessor...", flush=True)
     preprocessor = ArabertPreprocessor(model_name="aubmindlab/bert-base-arabertv02")
