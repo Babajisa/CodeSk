@@ -26,8 +26,9 @@ try:
     
     # Hapus file .lock di folder cache Hugging Face untuk mencegah stuck/hang dari download sebelumnya yang terputus
     import glob
-    cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
-    if os.path.exists(cache_dir):
+    cache_dir = getattr(huggingface_hub.constants, "HF_HUB_CACHE", None)
+    print(f"DEBUG: HF Cache Directory: {cache_dir}", flush=True)
+    if cache_dir and os.path.exists(cache_dir):
         lock_files = glob.glob(os.path.join(cache_dir, "**/*.lock"), recursive=True)
         for lock_file in lock_files:
             try:
@@ -35,8 +36,9 @@ try:
                 print(f"DEBUG: Menghapus file lock lama: {lock_file}", flush=True)
             except Exception:
                 pass
-except Exception:
-    pass
+except Exception as e:
+    print(f"DEBUG: Gagal memuat/membersihkan constants Hugging Face: {e}", flush=True)
+
 
 
 
