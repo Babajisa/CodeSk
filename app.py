@@ -291,8 +291,9 @@ def get_embedding(text):
     else:
         cleaned_text = str(text)
         
-    # Panggil API Hugging Face untuk mendapatkan embedding secara instan via router baru
-    api_url = "https://router.huggingface.co/hf-inference/models/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    # Panggil API Hugging Face untuk mendapatkan embedding secara instan via router baru dengan paksaan pipeline feature-extraction
+    api_url = "https://router.huggingface.co/hf-inference/pipeline/feature-extraction/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+
     headers = {}
     if os.environ.get('HF_TOKEN'):
         headers["Authorization"] = f"Bearer {os.environ.get('HF_TOKEN')}"
