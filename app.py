@@ -585,7 +585,7 @@ if st.sidebar.button("🧹 Hapus Riwayat Chat", use_container_width=True):
 # ==========================================
 # 2. PANEL UTAMA: CHAT & PROMPTING
 # ==========================================
-st.markdown('<div class="main-title">🕌 Asisten Pintar Tafsir AI</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">🕌 Aplikasi Chatbot QA Alquran AI</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">Model grounded AI: Ajukan pertanyaan Anda berdasarkan berkas rujukan aktif di panel kiri.</div>', unsafe_allow_html=True)
 
 # Hitung jumlah sumber aktif
