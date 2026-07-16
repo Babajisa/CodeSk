@@ -523,8 +523,15 @@ if col_sel_all.button("Pilih Semua", use_container_width=True):
         src["checked"] = True
     st.rerun()
 if col_sel_none.button("Kosongkan", use_container_width=True):
-    for src in st.session_state.sources:
-        src["checked"] = False
+    if os.path.exists(SOURCES_DIR):
+        for f in os.listdir(SOURCES_DIR):
+            if f.endswith(('.txt', '.md')):
+                try:
+                    os.remove(os.path.join(SOURCES_DIR, f))
+                except Exception:
+                    pass
+    st.session_state.sources = scan_sources_folder()
+    st.session_state.preview_source = None
     st.rerun()
 
 # Kolom Pencarian Sumber
